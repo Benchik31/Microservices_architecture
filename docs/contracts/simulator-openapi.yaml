@@ -1,0 +1,578 @@
+openapi: 3.1.1
+info:
+  title: API учебных имитаторов маркировки и учётной системы
+  version: 1.0.0
+  description: Учебный контракт двух имитаторов. На порту 8091 доступны allocate_codes и form_sets, на порту 8092 —
+      post_production. Повтор с теми же operationId и хешем возвращает прежний результат. Смена хеша или
+      kind даёт 409. Поле payloadHash рассчитывается как SHA-256(JCS(payload)), а compositionHash внутри
+      form_sets — как SHA-256(JCS(composition)). При NOT_FOUND разрешено повторить только сохранённый запрос
+      с прежними operationId, kind, хешем и байтами. Имитаторы обеспечивают атомарную идемпотентность. При
+      UNKNOWN или PROCESSING продолжается опрос, а REJECTED считается окончательным. Гарантии относятся
+      к протоколу учебных имитаторов.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+- url: http://localhost:8091
+  description: Имитатор маркировки. Операции allocate_codes и form_sets
+- url: http://localhost:8092
+  description: Имитатор учётной системы. Операция post_production
+security:
+- simulatorKey: []
+paths:
+  /operations:
+    post:
+      operationId: submitExternalOperation
+      summary: Зарегистрировать внешнюю операцию или получить её сохранённый результат
+      description: Перед вызовом сервис сохраняет намерение и payloadHash. Имитатор атомарно сохраняет operationId,
+          хеш и результат. Неподдерживаемый kind даёт 422. В режиме DROP_RESPONSE_AFTER_COMMIT имитатор
+          фиксирует эффект и разрывает соединение до ответа. Клиент сохраняет неизвестный исход. В режиме
+          REJECT_BEFORE_COMMIT имитатор сохраняет REJECTED до выдачи кодов или проводки. В режиме TEMPORARY_UNAVAILABLE
+          он возвращает 503 без применения эффекта. При неизвестном исходе клиент сверяет операцию.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationRequest'
+      responses:
+        "202":
+          description: Операция сохранена. Состояние PROCESSING означает, что результат ещё ожидается.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        "200":
+          description: Имитатор вернул существующую операцию с прежним результатом.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        "401":
+          description: Неверный ключ стенда
+        "409":
+          description: Этот operationId уже связан с другим видом операции или хешем запроса
+        "422":
+          description: Некорректное содержимое запроса или недопустимый вид операции
+        "503":
+          description: Имитатор временно недоступен. В Retry-After указано, через сколько секунд можно повторить запрос
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+  /operations/{operationId}:
+    get:
+      operationId: getExternalOperation
+      summary: Сверить результат исходной операции
+      parameters:
+      - name: operationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Результат по исходному идентификатору. При NOT_FOUND допускается повтор только сохранённого
+              запроса с тем же идентификатором и содержимым.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        "401":
+          description: Неверный ключ стенда
+        "503":
+          description: Сверка недоступна. Состояние операции остаётся неизвестным
+  /test/faults/{operationId}:
+    put:
+      operationId: setFaultPlan
+      summary: Настроить сбой для операции на стенде
+      description: Настройка отказа доступна по локальному адресу стенда и отдельному ключу управления. Оператор задаёт
+          её перед демонстрационным вызовом.
+      security:
+      - simulatorAdminKey: []
+      parameters:
+      - name: operationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaultPlan'
+      responses:
+        "204":
+          description: Настройка сбоя сохранена
+        "401":
+          description: Неверный ключ управления стендом
+        "422":
+          description: Неизвестный режим
+components:
+  securitySchemes:
+    simulatorKey:
+      type: apiKey
+      in: header
+      name: X-Simulator-Key
+      description: Секрет локального стенда передаётся через переменную окружения.
+    simulatorAdminKey:
+      type: apiKey
+      in: header
+      name: X-Simulator-Admin-Key
+      description: Отдельный ключ управления отказами доступен оператору стенда.
+  schemas:
+    OperationRequest:
+      oneOf:
+      - type: object
+        additionalProperties: false
+        required:
+        - operationId
+        - kind
+        - payloadHash
+        - payload
+        properties:
+          operationId:
+            type: string
+            format: uuid
+          kind:
+            type: string
+            enum:
+            - allocate_codes
+          payloadHash:
+            type: string
+            pattern: ^[a-f0-9]{64}$
+            description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+                в 03-contracts.md.
+          payload:
+            type: object
+            additionalProperties: false
+            required:
+            - orderId
+            - allocationId
+            - setGtin
+            - quantity
+            properties:
+              orderId:
+                type: string
+                format: uuid
+              allocationId:
+                type: string
+                format: uuid
+              setGtin:
+                type: string
+                enum:
+                - "04600000000008"
+              quantity:
+                type: integer
+                minimum: 1
+                maximum: 50
+      - type: object
+        additionalProperties: false
+        required:
+        - operationId
+        - kind
+        - payloadHash
+        - payload
+        properties:
+          operationId:
+            type: string
+            format: uuid
+          kind:
+            type: string
+            enum:
+            - form_sets
+          payloadHash:
+            type: string
+            pattern: ^[a-f0-9]{64}$
+            description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+                в 03-contracts.md.
+          payload:
+            type: object
+            additionalProperties: false
+            required:
+            - orderId
+            - formationId
+            - reservationId
+            - compositionHash
+            - composition
+            - approval
+            properties:
+              orderId:
+                type: string
+                format: uuid
+              formationId:
+                type: string
+                format: uuid
+              reservationId:
+                type: string
+                format: uuid
+              compositionHash:
+                type: string
+                pattern: ^[a-f0-9]{64}$
+                description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+                    в 03-contracts.md.
+              composition:
+                type: object
+                additionalProperties: false
+                required:
+                - orderId
+                - allocationId
+                - units
+                properties:
+                  orderId:
+                    type: string
+                    format: uuid
+                  allocationId:
+                    type: string
+                    format: uuid
+                  units:
+                    type: array
+                    minItems: 1
+                    maxItems: 50
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required:
+                      - unitId
+                      - setCodeId
+                      - kin
+                      - componentCis
+                      properties:
+                        unitId:
+                          type: string
+                          format: uuid
+                        setCodeId:
+                          type: string
+                          format: uuid
+                        kin:
+                          type: string
+                          pattern: ^[A-Z0-9-]{8,80}$
+                          description: Код стенда в учебном формате.
+                        componentCis:
+                          type: array
+                          minItems: 2
+                          maxItems: 2
+                          items:
+                            type: string
+                            pattern: ^[A-Z0-9-]{8,80}$
+                            description: Код стенда в учебном формате.
+                          uniqueItems: true
+              approval:
+                type: object
+                additionalProperties: false
+                required:
+                - actorId
+                - approvedAt
+                properties:
+                  actorId:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  approvedAt:
+                    type: string
+                    format: date-time
+      - type: object
+        additionalProperties: false
+        required:
+        - operationId
+        - kind
+        - payloadHash
+        - payload
+        properties:
+          operationId:
+            type: string
+            format: uuid
+          kind:
+            type: string
+            enum:
+            - post_production
+          payloadHash:
+            type: string
+            pattern: ^[a-f0-9]{64}$
+            description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+                в 03-contracts.md.
+          payload:
+            type: object
+            additionalProperties: false
+            required:
+            - orderId
+            - postingId
+            - reservationId
+            - formationId
+            - compositionHash
+            - markingDocumentId
+            - setSku
+            - quantity
+            - requirements
+            properties:
+              orderId:
+                type: string
+                format: uuid
+              postingId:
+                type: string
+                format: uuid
+              reservationId:
+                type: string
+                format: uuid
+              formationId:
+                type: string
+                format: uuid
+              compositionHash:
+                type: string
+                pattern: ^[a-f0-9]{64}$
+                description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+                    в 03-contracts.md.
+              markingDocumentId:
+                type: string
+                minLength: 1
+                maxLength: 120
+              setSku:
+                type: string
+                enum:
+                - SET-001
+              quantity:
+                type: integer
+                minimum: 1
+                maximum: 50
+              requirements:
+                type: array
+                minItems: 1
+                maxItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - sku
+                  - quantity
+                  properties:
+                    sku:
+                      type: string
+                      enum:
+                      - COMP-001
+                    quantity:
+                      type: integer
+                      minimum: 2
+                      maximum: 100
+    Operation:
+      type: object
+      additionalProperties: false
+      required:
+      - operationId
+      - status
+      - revision
+      - updatedAt
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - allocate_codes
+          - form_sets
+          - post_production
+        payloadHash:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+              в 03-contracts.md.
+        status:
+          type: string
+          enum:
+          - PROCESSING
+          - CONFIRMED
+          - REJECTED
+          - UNKNOWN
+          - NOT_FOUND
+        result:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            required:
+            - setCodes
+            properties:
+              setCodes:
+                type: array
+                minItems: 1
+                maxItems: 50
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - setCodeId
+                  - kin
+                  properties:
+                    setCodeId:
+                      type: string
+                      format: uuid
+                    kin:
+                      type: string
+                      pattern: ^[A-Z0-9-]{8,80}$
+                      description: Код стенда в учебном формате.
+          - type: object
+            additionalProperties: false
+            required:
+            - externalDocumentId
+            - compositionHash
+            properties:
+              externalDocumentId:
+                type: string
+                minLength: 1
+              compositionHash:
+                type: string
+                pattern: ^[a-f0-9]{64}$
+                description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+                    в 03-contracts.md.
+          - type: object
+            additionalProperties: false
+            required:
+            - erpDocumentId
+            properties:
+              erpDocumentId:
+                type: string
+                minLength: 1
+        reason:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type: string
+          format: date-time
+      allOf:
+      - if:
+          properties:
+            status:
+              enum:
+              - PROCESSING
+              - CONFIRMED
+              - REJECTED
+              - UNKNOWN
+        then:
+          required:
+          - kind
+          - payloadHash
+      - if:
+          properties:
+            status:
+              enum:
+              - CONFIRMED
+        then:
+          required:
+          - result
+      - if:
+          properties:
+            status:
+              enum:
+              - REJECTED
+        then:
+          required:
+          - reason
+      - if:
+          properties:
+            status:
+              enum:
+              - CONFIRMED
+            kind:
+              enum:
+              - allocate_codes
+          required:
+          - kind
+        then:
+          properties:
+            result:
+              required:
+              - setCodes
+      - if:
+          properties:
+            status:
+              enum:
+              - CONFIRMED
+            kind:
+              enum:
+              - form_sets
+          required:
+          - kind
+        then:
+          properties:
+            result:
+              required:
+              - externalDocumentId
+      - if:
+          properties:
+            status:
+              enum:
+              - CONFIRMED
+            kind:
+              enum:
+              - post_production
+          required:
+          - kind
+        then:
+          properties:
+            result:
+              required:
+              - erpDocumentId
+    FaultPlan:
+      type: object
+      additionalProperties: false
+      required:
+      - fault
+      - times
+      properties:
+        fault:
+          type: string
+          enum:
+          - NONE
+          - DROP_RESPONSE_AFTER_COMMIT
+          - REJECT_BEFORE_COMMIT
+          - TEMPORARY_UNAVAILABLE
+        times:
+          type: integer
+          minimum: 1
+          maximum: 10
+    Problem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - requestId
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        code:
+          type: string
+          enum:
+          - BAD_REQUEST
+          - UNAUTHENTICATED
+          - FORBIDDEN
+          - NOT_FOUND
+          - IDEMPOTENCY_CONFLICT
+          - INVALID_STATE
+          - DUPLICATE_CODE
+          - PAYLOAD_CONFLICT
+          - STALE_REVISION
+          - PRECONDITION_REQUIRED
+          - BUSINESS_RULE_VIOLATION
+          - DEPENDENCY_UNAVAILABLE
+          - INTERNAL_ERROR
+        requestId:
+          type: string
+          format: uuid

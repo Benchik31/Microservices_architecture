@@ -1,0 +1,1878 @@
+description: Схемы служебных полей и данных для 16 сообщений AsyncAPI.
+schemas:
+  UUID:
+    type: string
+    format: uuid
+  DateTime:
+    type: string
+    format: date-time
+  Sha256:
+    type: string
+    pattern: ^[a-f0-9]{64}$
+    description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны в 03-contracts.md.
+  SyntheticCode:
+    type: string
+    pattern: ^[A-Z0-9-]{8,80}$
+    description: Код стенда в учебном формате.
+  UnitComposition:
+    type: object
+    additionalProperties: false
+    required:
+    - unitId
+    - setCodeId
+    - kin
+    - componentCis
+    properties:
+      unitId:
+        type: string
+        format: uuid
+      setCodeId:
+        type: string
+        format: uuid
+      kin:
+        type: string
+        pattern: ^[A-Z0-9-]{8,80}$
+        description: Код стенда в учебном формате.
+      componentCis:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+          pattern: ^[A-Z0-9-]{8,80}$
+          description: Код стенда в учебном формате.
+        uniqueItems: true
+  Requirement:
+    type: object
+    additionalProperties: false
+    required:
+    - sku
+    - quantity
+    properties:
+      sku:
+        type: string
+        enum:
+        - COMP-001
+      quantity:
+        type: integer
+        minimum: 2
+        maximum: 100
+  Composition:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - allocationId
+    - units
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      allocationId:
+        type: string
+        format: uuid
+      units:
+        type: array
+        minItems: 1
+        maxItems: 50
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - unitId
+          - setCodeId
+          - kin
+          - componentCis
+          properties:
+            unitId:
+              type: string
+              format: uuid
+            setCodeId:
+              type: string
+              format: uuid
+            kin:
+              type: string
+              pattern: ^[A-Z0-9-]{8,80}$
+              description: Код стенда в учебном формате.
+            componentCis:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: string
+                pattern: ^[A-Z0-9-]{8,80}$
+                description: Код стенда в учебном формате.
+              uniqueItems: true
+  Approval:
+    type: object
+    additionalProperties: false
+    required:
+    - actorId
+    - approvedAt
+    properties:
+      actorId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      approvedAt:
+        type: string
+        format: date-time
+  ReserveComponentsData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - reservationId
+    - warehouseId
+    - requirements
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      reservationId:
+        type: string
+        format: uuid
+      warehouseId:
+        type: string
+        enum:
+        - warehouse-demo
+      requirements:
+        type: array
+        minItems: 1
+        maxItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - sku
+          - quantity
+          properties:
+            sku:
+              type: string
+              enum:
+              - COMP-001
+            quantity:
+              type: integer
+              minimum: 2
+              maximum: 100
+  ReserveComponentsEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - ReserveComponents
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - assembly
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/ReserveComponentsData'
+  ComponentsReservedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - reservationId
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      reservationId:
+        type: string
+        format: uuid
+  ComponentsReservedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - ComponentsReserved
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - inventory
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/ComponentsReservedData'
+  ComponentsReservationRejectedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - reservationId
+    - reason
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      reservationId:
+        type: string
+        format: uuid
+      reason:
+        type: string
+        enum:
+        - INSUFFICIENT_STOCK
+        - INVALID_REQUIREMENTS
+  ComponentsReservationRejectedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - ComponentsReservationRejected
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - inventory
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/ComponentsReservationRejectedData'
+  AllocateSetCodesData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - allocationId
+    - setGtin
+    - quantity
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      allocationId:
+        type: string
+        format: uuid
+      setGtin:
+        type: string
+        enum:
+        - "04600000000008"
+      quantity:
+        type: integer
+        minimum: 1
+        maximum: 50
+  AllocateSetCodesEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - AllocateSetCodes
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - assembly
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/AllocateSetCodesData'
+  SetCodesAllocatedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - allocationId
+    - setCodes
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      allocationId:
+        type: string
+        format: uuid
+      setCodes:
+        type: array
+        minItems: 1
+        maxItems: 50
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - setCodeId
+          - kin
+          properties:
+            setCodeId:
+              type: string
+              format: uuid
+            kin:
+              type: string
+              pattern: ^[A-Z0-9-]{8,80}$
+              description: Код стенда в учебном формате.
+  SetCodesAllocatedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - SetCodesAllocated
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - marking
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/SetCodesAllocatedData'
+  SetCodeAllocationRejectedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - allocationId
+    - reason
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      allocationId:
+        type: string
+        format: uuid
+      reason:
+        type: string
+        enum:
+        - ALLOCATION_REJECTED
+        - INVALID_REQUEST
+  SetCodeAllocationRejectedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - SetCodeAllocationRejected
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - marking
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/SetCodeAllocationRejectedData'
+  ReleaseComponentsData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - reservationId
+    - reason
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      reservationId:
+        type: string
+        format: uuid
+      reason:
+        type: string
+        enum:
+        - CODE_ALLOCATION_REJECTED
+  ReleaseComponentsEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - ReleaseComponents
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - assembly
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/ReleaseComponentsData'
+  ComponentsReleasedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - reservationId
+    - reason
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      reservationId:
+        type: string
+        format: uuid
+      reason:
+        type: string
+        enum:
+        - CODE_ALLOCATION_REJECTED
+  ComponentsReleasedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - ComponentsReleased
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - inventory
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/ComponentsReleasedData'
+  FormSetsData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - formationId
+    - reservationId
+    - compositionHash
+    - composition
+    - approval
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      formationId:
+        type: string
+        format: uuid
+      reservationId:
+        type: string
+        format: uuid
+      compositionHash:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+        description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны в
+            03-contracts.md.
+      composition:
+        type: object
+        additionalProperties: false
+        required:
+        - orderId
+        - allocationId
+        - units
+        properties:
+          orderId:
+            type: string
+            format: uuid
+          allocationId:
+            type: string
+            format: uuid
+          units:
+            type: array
+            minItems: 1
+            maxItems: 50
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - unitId
+              - setCodeId
+              - kin
+              - componentCis
+              properties:
+                unitId:
+                  type: string
+                  format: uuid
+                setCodeId:
+                  type: string
+                  format: uuid
+                kin:
+                  type: string
+                  pattern: ^[A-Z0-9-]{8,80}$
+                  description: Код стенда в учебном формате.
+                componentCis:
+                  type: array
+                  minItems: 2
+                  maxItems: 2
+                  items:
+                    type: string
+                    pattern: ^[A-Z0-9-]{8,80}$
+                    description: Код стенда в учебном формате.
+                  uniqueItems: true
+      approval:
+        type: object
+        additionalProperties: false
+        required:
+        - actorId
+        - approvedAt
+        properties:
+          actorId:
+            type: string
+            minLength: 1
+            maxLength: 120
+          approvedAt:
+            type: string
+            format: date-time
+  FormSetsEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - FormSets
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - assembly
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/FormSetsData'
+  SetsFormationConfirmedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - formationId
+    - compositionHash
+    - externalDocumentId
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      formationId:
+        type: string
+        format: uuid
+      compositionHash:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+        description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны в
+            03-contracts.md.
+      externalDocumentId:
+        type: string
+        minLength: 1
+        maxLength: 120
+  SetsFormationConfirmedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - SetsFormationConfirmed
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - marking
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/SetsFormationConfirmedData'
+  SetsFormationRejectedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - formationId
+    - reason
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      formationId:
+        type: string
+        format: uuid
+      reason:
+        type: string
+        enum:
+        - INVALID_COMPOSITION
+        - EXTERNAL_REJECTION
+  SetsFormationRejectedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - SetsFormationRejected
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - marking
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/SetsFormationRejectedData'
+  MarkingOperationUncertainData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - operationId
+    - stage
+    - reason
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      operationId:
+        type: string
+        format: uuid
+      stage:
+        type: string
+        enum:
+        - ALLOCATION
+        - FORMATION
+      reason:
+        type: string
+        enum:
+        - TIMEOUT
+        - CONNECTION_LOST
+        - UNVERIFIABLE_RESULT
+  MarkingOperationUncertainEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - MarkingOperationUncertain
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - marking
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/MarkingOperationUncertainData'
+  CommitProductionData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - postingId
+    - reservationId
+    - formationId
+    - compositionHash
+    - markingDocumentId
+    - setSku
+    - quantity
+    - requirements
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      postingId:
+        type: string
+        format: uuid
+      reservationId:
+        type: string
+        format: uuid
+      formationId:
+        type: string
+        format: uuid
+      compositionHash:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+        description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны в
+            03-contracts.md.
+      markingDocumentId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      setSku:
+        type: string
+        enum:
+        - SET-001
+      quantity:
+        type: integer
+        minimum: 1
+        maximum: 50
+      requirements:
+        type: array
+        minItems: 1
+        maxItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - sku
+          - quantity
+          properties:
+            sku:
+              type: string
+              enum:
+              - COMP-001
+            quantity:
+              type: integer
+              minimum: 2
+              maximum: 100
+  CommitProductionEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - CommitProduction
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - assembly
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/CommitProductionData'
+  ProductionRecordedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - postingId
+    - erpDocumentId
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      postingId:
+        type: string
+        format: uuid
+      erpDocumentId:
+        type: string
+        minLength: 1
+        maxLength: 120
+  ProductionRecordedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - ProductionRecorded
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - inventory
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/ProductionRecordedData'
+  ProductionUncertainData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - postingId
+    - reason
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      postingId:
+        type: string
+        format: uuid
+      reason:
+        type: string
+        enum:
+        - TIMEOUT
+        - CONNECTION_LOST
+        - UNVERIFIABLE_RESULT
+  ProductionUncertainEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - ProductionUncertain
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - inventory
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/ProductionUncertainData'
+  ProductionBlockedData:
+    type: object
+    additionalProperties: false
+    required:
+    - orderId
+    - postingId
+    - reason
+    properties:
+      orderId:
+        type: string
+        format: uuid
+      postingId:
+        type: string
+        format: uuid
+      reason:
+        type: string
+        enum:
+        - EXTERNAL_REJECTION
+        - RESERVATION_MISMATCH
+        - PAYLOAD_CONFLICT
+  ProductionBlockedEnvelope:
+    type: object
+    additionalProperties: false
+    required:
+    - messageId
+    - type
+    - schemaVersion
+    - occurredAt
+    - correlationId
+    - causationId
+    - producer
+    - aggregateId
+    - aggregateVersion
+    - data
+    properties:
+      messageId:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum:
+        - ProductionBlocked
+      schemaVersion:
+        type: integer
+        enum:
+        - 1
+      occurredAt:
+        type: string
+        format: date-time
+      correlationId:
+        type: string
+        format: uuid
+      causationId:
+        type: string
+        format: uuid
+      producer:
+        type: string
+        enum:
+        - inventory
+      aggregateId:
+        type: string
+        minLength: 1
+        maxLength: 120
+      aggregateVersion:
+        type: integer
+        minimum: 1
+      data:
+        $ref: '#/schemas/ProductionBlockedData'
+messages:
+  ReserveComponents:
+    name: ReserveComponents
+    title: Зарезервировать компоненты
+    summary: Команда создаёт резерв по уникальному orderId. Доступный остаток рассчитывается как available = onHand
+        - reserved. При повторе значение reserved сохраняется.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/ReserveComponentsEnvelope'
+    x-producer: assembly
+    x-consumers:
+    - inventory
+    x-message-kind: command
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 0f897b84-dcd9-5d35-9f89-f9506b9bae4b
+        type: ReserveComponents
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: assembly
+        aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        aggregateVersion: 1
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+          warehouseId: warehouse-demo
+          requirements:
+          - sku: COMP-001
+            quantity: 2
+  ComponentsReserved:
+    name: ComponentsReserved
+    title: Компоненты зарезервированы
+    summary: Действующий резерв (ACTIVE) и исходящее сообщение зафиксированы вместе. Подтверждение физической сборки
+        проходит отдельным шагом.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/ComponentsReservedEnvelope'
+    x-producer: inventory
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: ca8f9fc2-68a0-58f1-b7fb-98dba0a45e64
+        type: ComponentsReserved
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: inventory
+        aggregateId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+        aggregateVersion: 2
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+  ComponentsReservationRejected:
+    name: ComponentsReservationRejected
+    title: Резерв компонентов отклонён
+    summary: Создание резерва отклонено. Задание остаётся без выдачи кодов и сборки.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/ComponentsReservationRejectedEnvelope'
+    x-producer: inventory
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: c4a21f76-e113-5457-8a77-3b657145e2c4
+        type: ComponentsReservationRejected
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: inventory
+        aggregateId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+        aggregateVersion: 3
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+          reason: INSUFFICIENT_STOCK
+  AllocateSetCodes:
+    name: AllocateSetCodes
+    title: Получить коды наборов
+    summary: Команда на получение количества кодов, указанного в quantity. Идентификатор allocationId сохраняется
+        при всех попытках и сверках.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/AllocateSetCodesEnvelope'
+    x-producer: assembly
+    x-consumers:
+    - marking
+    x-message-kind: command
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 4c455436-e8fc-5665-9a3a-3970f391bb2b
+        type: AllocateSetCodes
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: assembly
+        aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        aggregateVersion: 4
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+          setGtin: "04600000000008"
+          quantity: 1
+  SetCodesAllocated:
+    name: SetCodesAllocated
+    title: Коды наборов получены
+    summary: Сервис «Маркировка» проверил результат и сохранил в своей БД ровно quantity разных КИН. Повтор возвращает
+        те же коды.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/SetCodesAllocatedEnvelope'
+    x-producer: marking
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 3d5a730c-d24d-5bb0-a686-eed02073bcbb
+        type: SetCodesAllocated
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: marking
+        aggregateId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+        aggregateVersion: 5
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+          setCodes:
+          - setCodeId: e217645e-d8ca-55a3-b31a-0b6888ed7bf9
+            kin: KIN-DEMO-00000001
+  SetCodeAllocationRejected:
+    name: SetCodeAllocationRejected
+    title: Выдача кодов наборов отклонена
+    summary: Окончательно известно, что выдачи кодов не было. Только это событие разрешает автоматическую компенсацию
+      резерва.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/SetCodeAllocationRejectedEnvelope'
+    x-producer: marking
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: e24e1b97-147d-560a-a687-e1d2a9928c2b
+        type: SetCodeAllocationRejected
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: marking
+        aggregateId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+        aggregateVersion: 6
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+          reason: ALLOCATION_REJECTED
+  ReleaseComponents:
+    name: ReleaseComponents
+    title: Освободить резерв компонентов
+    summary: Освобождает резерв до физической сборки, когда получен окончательный отказ и подтверждено, что
+      коды не выдавались.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/ReleaseComponentsEnvelope'
+    x-producer: assembly
+    x-consumers:
+    - inventory
+    x-message-kind: command
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 4677e9cd-d35d-598b-9e8b-bb9310e2bd31
+        type: ReleaseComponents
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: assembly
+        aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        aggregateVersion: 7
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+          reason: CODE_ALLOCATION_REJECTED
+  ComponentsReleased:
+    name: ComponentsReleased
+    title: Резерв компонентов освобождён
+    summary: Резерв RELEASED зафиксирован. Повтор не увеличивает доступный остаток.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/ComponentsReleasedEnvelope'
+    x-producer: inventory
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: e54366ac-65bb-5907-88d4-8495bd06f11d
+        type: ComponentsReleased
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: inventory
+        aggregateId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+        aggregateVersion: 8
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+          reason: CODE_ALLOCATION_REJECTED
+  FormSets:
+    name: FormSets
+    title: Сформировать наборы
+    summary: Отправка неизменяемого состава после подтверждения физической сборки и учебного согласования состава.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/FormSetsEnvelope'
+    x-producer: assembly
+    x-consumers:
+    - marking
+    x-message-kind: command
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: eadd2279-d6f7-50e6-9f80-05cbda535456
+        type: FormSets
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: assembly
+        aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        aggregateVersion: 9
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+          formationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+          compositionHash: 42378cf420d468ea651c0536a05ff89f15fcb75bf42e9499b8884e942ef4a5ca
+          composition:
+            orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+            allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+            units:
+            - unitId: 247535ce-7ae5-5ce1-8331-ba42cac2e4f7
+              setCodeId: e217645e-d8ca-55a3-b31a-0b6888ed7bf9
+              kin: KIN-DEMO-00000001
+              componentCis:
+              - CIS-DEMO-00000001
+              - CIS-DEMO-00000002
+          approval:
+            actorId: signer-demo
+            approvedAt: '2026-11-09T09:10:00Z'
+  SetsFormationConfirmed:
+    name: SetsFormationConfirmed
+    title: Формирование наборов подтверждено
+    summary: Исходный внешний документ и его состав подтверждены. Хеш совпал. После этого можно начать учёт выпуска.
+        Статус COMPLETED требует подтверждения учёта.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/SetsFormationConfirmedEnvelope'
+    x-producer: marking
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: e8c1e993-4b55-567f-ab01-87930da9e6ba
+        type: SetsFormationConfirmed
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: marking
+        aggregateId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+        aggregateVersion: 10
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          formationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+          compositionHash: 42378cf420d468ea651c0536a05ff89f15fcb75bf42e9499b8884e942ef4a5ca
+          externalDocumentId: marking-doc-demo-001
+  SetsFormationRejected:
+    name: SetsFormationRejected
+    title: Формирование наборов отклонено
+    summary: После окончательного отказа собранные наборы переходят в карантин (QUARANTINED). Резерв и закрепления
+        кодов сохраняются для разбора.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/SetsFormationRejectedEnvelope'
+    x-producer: marking
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: c1cd2375-0c1a-56fb-9160-6aa495ec5f9c
+        type: SetsFormationRejected
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: marking
+        aggregateId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+        aggregateVersion: 11
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          formationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+          reason: EXTERNAL_REJECTION
+  MarkingOperationUncertain:
+    name: MarkingOperationUncertain
+    title: Исход операции маркировки неизвестен
+    summary: Исход внешней записи неизвестен. Сервис сохраняет намерение и блокировки и сверяет исходную операцию.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/MarkingOperationUncertainEnvelope'
+    x-producer: marking
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 9921f1aa-b684-5a85-a70a-caf0d80a92cb
+        type: MarkingOperationUncertain
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: marking
+        aggregateId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+        aggregateVersion: 12
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          operationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+          stage: FORMATION
+          reason: CONNECTION_LOST
+  CommitProduction:
+    name: CommitProduction
+    title: Учесть выпуск наборов
+    summary: Списывает 2N компонентов и учитывает выпуск N наборов после подтверждения маркировки и сверки
+      с резервом. При повторе используется тот же postingId.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/CommitProductionEnvelope'
+    x-producer: assembly
+    x-consumers:
+    - inventory
+    x-message-kind: command
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 0170c033-6b5a-5a58-ae54-2704ac70b44c
+        type: CommitProduction
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: assembly
+        aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        aggregateVersion: 13
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+          postingId: 0312de5e-d03a-5821-9d33-b08764101c46
+          formationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+          compositionHash: 42378cf420d468ea651c0536a05ff89f15fcb75bf42e9499b8884e942ef4a5ca
+          markingDocumentId: marking-doc-demo-001
+          setSku: SET-001
+          quantity: 1
+          requirements:
+          - sku: COMP-001
+            quantity: 2
+  ProductionRecorded:
+    name: ProductionRecorded
+    title: Выпуск наборов учтён
+    summary: Документ внешней учётной системы проверен. Локальный регистр, состояние израсходованного резерва (CONSUMED)
+        и таблица исходящих сообщений обновлены одной транзакцией.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/ProductionRecordedEnvelope'
+    x-producer: inventory
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 0107b598-3244-5aff-8835-ca09fff864c8
+        type: ProductionRecorded
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: inventory
+        aggregateId: 0312de5e-d03a-5821-9d33-b08764101c46
+        aggregateVersion: 14
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          postingId: 0312de5e-d03a-5821-9d33-b08764101c46
+          erpDocumentId: erp-doc-demo-001
+  ProductionUncertain:
+    name: ProductionUncertain
+    title: Исход учёта выпуска неизвестен
+    summary: Результат внешней учётной системы пока не подтверждён. Резерв удерживается, а учёт ожидает сверки.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/ProductionUncertainEnvelope'
+    x-producer: inventory
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 25c953b5-08ff-5874-9ae4-e59bd4774952
+        type: ProductionUncertain
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: inventory
+        aggregateId: 0312de5e-d03a-5821-9d33-b08764101c46
+        aggregateVersion: 15
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          postingId: 0312de5e-d03a-5821-9d33-b08764101c46
+          reason: CONNECTION_LOST
+  ProductionBlocked:
+    name: ProductionBlocked
+    title: Учёт выпуска заблокирован
+    summary: Окончательный отказ разбирает оператор. Резерв остаётся активным, подтверждённое формирование
+      не повторяется.
+    contentType: application/json
+    correlationId:
+      description: Значение поля orderId сохраняется на всех шагах задания.
+      location: $message.payload#/correlationId
+    payload:
+      $ref: '#/schemas/ProductionBlockedEnvelope'
+    x-producer: inventory
+    x-consumers:
+    - assembly
+    x-message-kind: event
+    examples:
+    - name: singleSetExample
+      summary: Пример одного набора с учебными кодами маркировки.
+      payload:
+        messageId: 39dff25e-211d-5be7-ba50-e2e3fae345af
+        type: ProductionBlocked
+        schemaVersion: 1
+        occurredAt: '2026-11-09T09:15:00Z'
+        correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+        producer: inventory
+        aggregateId: 0312de5e-d03a-5821-9d33-b08764101c46
+        aggregateVersion: 16
+        data:
+          orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+          postingId: 0312de5e-d03a-5821-9d33-b08764101c46
+          reason: EXTERNAL_REJECTION

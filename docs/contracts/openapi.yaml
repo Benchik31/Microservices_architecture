@@ -1,0 +1,1469 @@
+openapi: 3.1.1
+info:
+  title: Публичный REST API сборки маркированных наборов
+  version: 1.0.0
+  description: Учебный контракт трёх сервисов для запросов интерфейса через обратный прокси-сервер. Команды и результаты
+      между сервисами передаются через RabbitMQ. Доступ к стенду предоставляют локальные тестовые токены
+      JWT.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+- url: http://localhost:8080
+  description: Локальный интерфейс и обратный прокси-сервер на стенде
+tags:
+- name: Assembly
+  description: Задания, физический состав и координация этапов сборки
+- name: Inventory
+  description: Остатки, резервы и учёт выпуска
+- name: Marking
+  description: КИН и внешние операции маркировки
+security:
+- bearerAuth: []
+paths:
+  /api/assembly/orders:
+    post:
+      tags:
+      - Assembly
+      operationId: createOrder
+      summary: Создать задание на сборку
+      description: Одной транзакцией сохраняет задание в состоянии RESERVING, постоянный reservationId и исходящую
+          команду ReserveComponents. Сервер выбирает снимок рецепта. Код HTTP 202 подтверждает приём команды.
+          Ответ содержит заголовки Location и ETag.
+      x-service: assembly
+      x-required-roles:
+      - planner
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        "202":
+          description: Команда принята. Итоговое состояние процесса читается отдельным запросом.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+              example:
+                orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+                recipeId: recipe-demo-v1
+                recipeVersion: 1
+                warehouseId: warehouse-demo
+                setSku: SET-001
+                setGtin: "04600000000008"
+                quantity: 1
+                requirements:
+                - sku: COMP-001
+                  quantity: 2
+                status: RESERVING
+                revision: 1
+                reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+                allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+                createdAt: '2026-11-09T09:00:00Z'
+                updatedAt: '2026-11-09T09:10:00Z'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+            Location:
+              description: Адрес задания для повторных запросов состояния.
+              schema:
+                type: string
+                format: uri-reference
+              example: /api/assembly/orders/fcf08387-7efd-5232-baa8-6a5d96620e50
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "409":
+          $ref: '#/components/responses/Error409'
+        "422":
+          $ref: '#/components/responses/Error422'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrder'
+            example:
+              recipeId: recipe-demo-v1
+              quantity: 1
+  /api/assembly/orders/{orderId}:
+    get:
+      tags:
+      - Assembly
+      operationId: getOrder
+      summary: Получить состояние задания
+      description: Представление задания в сервисе «Сборка». При задержке событий состояние отражают поля updatedAt
+          и lastIssue. Состав заполняется по мере сборки.
+      x-service: assembly
+      x-required-roles:
+      - planner
+      - warehouse
+      - signer
+      - operator
+      parameters:
+      - $ref: '#/components/parameters/orderId'
+      - $ref: '#/components/parameters/RequestId'
+      responses:
+        "200":
+          description: Текущее представление ресурса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+              example:
+                orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+                recipeId: recipe-demo-v1
+                recipeVersion: 1
+                warehouseId: warehouse-demo
+                setSku: SET-001
+                setGtin: "04600000000008"
+                quantity: 1
+                requirements:
+                - sku: COMP-001
+                  quantity: 2
+                status: ASSEMBLING
+                revision: 7
+                reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+                allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+                createdAt: '2026-11-09T09:00:00Z'
+                updatedAt: '2026-11-09T09:10:00Z'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+  /api/assembly/orders/{orderId}/units:
+    post:
+      tags:
+      - Assembly
+      operationId: scanUnit
+      summary: Зафиксировать один набор и два компонента
+      description: В состоянии ASSEMBLING сервис одной транзакцией проверяет количество, принадлежность КИН заказу,
+          ревизию и уникальность componentCis и kin, затем сохраняет набор и закрепляет коды. Перед вычислением
+          хеша коды приводятся к каноническому виду. Каждый unitId связан с одним составом.
+      x-service: assembly
+      x-required-roles:
+      - warehouse
+      parameters:
+      - $ref: '#/components/parameters/orderId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        "200":
+          description: Текущее представление ресурса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "409":
+          $ref: '#/components/responses/Error409'
+        "412":
+          $ref: '#/components/responses/Error412'
+        "422":
+          $ref: '#/components/responses/Error422'
+        "428":
+          $ref: '#/components/responses/Error428'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnitComposition'
+            example:
+              unitId: 247535ce-7ae5-5ce1-8331-ba42cac2e4f7
+              setCodeId: e217645e-d8ca-55a3-b31a-0b6888ed7bf9
+              kin: KIN-DEMO-00000001
+              componentCis:
+              - CIS-DEMO-00000001
+              - CIS-DEMO-00000002
+  /api/assembly/orders/{orderId}/physical-confirmation:
+    post:
+      tags:
+      - Assembly
+      operationId: confirmPhysicalAssembly
+      summary: Подтвердить физическую сборку всей партии
+      description: Требуются ровно N полных наборов с двумя различными компонентами в каждом. Сервис фиксирует physicalConfirmedAt
+          и неизменяемый compositionHash, затем переводит задание в AWAITING_APPROVAL. Формирование запускается
+          отдельной командой.
+      x-service: assembly
+      x-required-roles:
+      - warehouse
+      parameters:
+      - $ref: '#/components/parameters/orderId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        "200":
+          description: Текущее представление ресурса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "409":
+          $ref: '#/components/responses/Error409'
+        "412":
+          $ref: '#/components/responses/Error412'
+        "422":
+          $ref: '#/components/responses/Error422'
+        "428":
+          $ref: '#/components/responses/Error428'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhysicalConfirmation'
+            example:
+              confirmed: true
+  /api/assembly/orders/{orderId}/formation-approval:
+    post:
+      tags:
+      - Assembly
+      operationId: approveFormation
+      summary: Утвердить состав для учебного формирования
+      description: Команда допустима в состоянии AWAITING_APPROVAL при совпадении хеша. Сотрудник определяется по JWT,
+          approvedAt выставляет сервер. Одна транзакция сохраняет approval, formationId, состояние MARKING_PENDING
+          и команду FormSets. После учебного согласования состав фиксируется.
+      x-service: assembly
+      x-required-roles:
+      - signer
+      parameters:
+      - $ref: '#/components/parameters/orderId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        "202":
+          description: Команда принята. Итоговое состояние процесса читается отдельным запросом.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "409":
+          $ref: '#/components/responses/Error409'
+        "412":
+          $ref: '#/components/responses/Error412'
+        "422":
+          $ref: '#/components/responses/Error422'
+        "428":
+          $ref: '#/components/responses/Error428'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FormationApproval'
+            example:
+              compositionHash: 42378cf420d468ea651c0536a05ff89f15fcb75bf42e9499b8884e942ef4a5ca
+              approved: true
+  /api/inventory/stock:
+    get:
+      tags:
+      - Inventory
+      operationId: getStock
+      summary: Получить остаток по артикулу
+      description: Поля onHand, reserved и available ведёт сервис «Складской учёт». Исходный запас задан тестовыми
+          данными. Доступный остаток рассчитывается по собственному регистру сервиса.
+      x-service: inventory
+      x-required-roles:
+      - planner
+      - warehouse
+      - signer
+      - operator
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - name: sku
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - COMP-001
+          - SET-001
+      responses:
+        "200":
+          description: Текущее представление ресурса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stock'
+              example:
+                warehouseId: warehouse-demo
+                sku: COMP-001
+                onHand: 100
+                reserved: 2
+                available: 98
+                revision: 3
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+  /api/inventory/reservations/{reservationId}:
+    get:
+      tags:
+      - Inventory
+      operationId: getReservation
+      summary: Получить состояние резерва компонентов
+      x-service: inventory
+      x-required-roles:
+      - planner
+      - warehouse
+      - signer
+      - operator
+      parameters:
+      - $ref: '#/components/parameters/reservationId'
+      - $ref: '#/components/parameters/RequestId'
+      responses:
+        "200":
+          description: Текущее представление ресурса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+  /api/inventory/postings/{postingId}:
+    get:
+      tags:
+      - Inventory
+      operationId: getPosting
+      summary: Получить результат учёта выпуска
+      x-service: inventory
+      x-required-roles:
+      - planner
+      - warehouse
+      - signer
+      - operator
+      parameters:
+      - $ref: '#/components/parameters/postingId'
+      - $ref: '#/components/parameters/RequestId'
+      responses:
+        "200":
+          description: Текущее представление ресурса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Posting'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+  /api/inventory/postings/{postingId}/reconciliation:
+    post:
+      tags:
+      - Inventory
+      operationId: reconcilePosting
+      summary: Запланировать сверку исходной учётной операции
+      description: If-Match проверяет ревизию операции Posting. Сервис сверяет исходный postingId и локальный регистр.
+          При NOT_FOUND он может повторить сохранённый запрос с теми же postingId, видом, хешем и байтами.
+          Безопасность гарантирует атомарная идемпотентность имитатора учётной системы. При REJECTED сохраняются
+          BLOCKED и прежний запрос. Повторная сверка использует новый ключ HTTP и прежний postingId.
+      x-service: inventory
+      x-required-roles:
+      - operator
+      parameters:
+      - $ref: '#/components/parameters/postingId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        "202":
+          description: Команда принята. Итоговое состояние процесса читается отдельным запросом.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationAccepted'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "409":
+          $ref: '#/components/responses/Error409'
+        "412":
+          $ref: '#/components/responses/Error412'
+        "422":
+          $ref: '#/components/responses/Error422'
+        "428":
+          $ref: '#/components/responses/Error428'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+  /api/marking/allocations/{allocationId}:
+    get:
+      tags:
+      - Marking
+      operationId: getAllocation
+      summary: Получить состояние выдачи учебных КИН
+      x-service: marking
+      x-required-roles:
+      - warehouse
+      - signer
+      - operator
+      parameters:
+      - $ref: '#/components/parameters/allocationId'
+      - $ref: '#/components/parameters/RequestId'
+      responses:
+        "200":
+          description: Текущее представление ресурса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Allocation'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+  /api/marking/formations/{formationId}:
+    get:
+      tags:
+      - Marking
+      operationId: getFormation
+      summary: Получить состояние формирования наборов
+      x-service: marking
+      x-required-roles:
+      - planner
+      - warehouse
+      - signer
+      - operator
+      parameters:
+      - $ref: '#/components/parameters/formationId'
+      - $ref: '#/components/parameters/RequestId'
+      responses:
+        "200":
+          description: Текущее представление ресурса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Formation'
+          headers:
+            ETag:
+              description: Сильный ETag текущей ревизии, например "7".
+              schema:
+                type: string
+                pattern: ^"[1-9][0-9]*"$
+              example: '"7"'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+  /api/marking/operations/{operationId}/reconciliation:
+    post:
+      tags:
+      - Marking
+      operationId: reconcileMarkingOperation
+      summary: Запланировать сверку исходной операции маркировки
+      description: Идентификатор operationId равен allocationId или formationId. Заголовок If-Match берётся из GET
+          соответствующей выдачи или формирования. Сервис читает исходную операцию и публикует подтверждённый
+          результат с её прежним идентификатором. При NOT_FOUND можно повторить сохранённый запрос с теми
+          же operationId, kind, payloadHash и байтами. Безопасность гарантирует атомарная идемпотентность
+          имитатора. При UNKNOWN или PROCESSING продолжается опрос.
+      x-service: marking
+      x-required-roles:
+      - operator
+      parameters:
+      - $ref: '#/components/parameters/operationId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        "202":
+          description: Команда принята. Итоговое состояние процесса читается отдельным запросом.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationAccepted'
+        "400":
+          $ref: '#/components/responses/Error400'
+        "401":
+          $ref: '#/components/responses/Error401'
+        "403":
+          $ref: '#/components/responses/Error403'
+        "404":
+          $ref: '#/components/responses/Error404'
+        "409":
+          $ref: '#/components/responses/Error409'
+        "412":
+          $ref: '#/components/responses/Error412'
+        "422":
+          $ref: '#/components/responses/Error422'
+        "428":
+          $ref: '#/components/responses/Error428'
+        "503":
+          $ref: '#/components/responses/Error503'
+        "500":
+          $ref: '#/components/responses/Error500'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Сервис проверяет подпись, iss, aud, exp и role. Поле sub определяет сотрудника. Учебные роли — planner,
+          warehouse, signer и operator. Секрет передаётся через переменную окружения.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID команды HTTP. Повтор той же операции возвращает сохранённый ответ. Другое тело, маршрут или
+          сотрудник дают 409. Проверка повтора выполняется до If-Match.
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Сильный ETag из последнего GET изменяемого ресурса. Принимается только одно конкретное значение.
+      schema:
+        type: string
+        pattern: ^"[1-9][0-9]*"$
+      example: '"7"'
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: UUID для поиска записей об одном запросе. Если клиент его не передал, сервер создаёт UUID сам.
+      schema:
+        type: string
+        format: uuid
+    orderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    reservationId:
+      name: reservationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    postingId:
+      name: postingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    allocationId:
+      name: allocationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    formationId:
+      name: formationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    operationId:
+      name: operationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Error400:
+      description: Неверный JSON или заголовок
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error401:
+      description: JWT отсутствует или не прошёл проверку
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error403:
+      description: У пользователя нет нужной роли
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error404:
+      description: Ресурс не найден
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error409:
+      description: Конфликт ключа, состояния, состава либо уникальности кода
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error412:
+      description: Ревизия не совпала
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error422:
+      description: Нарушено правило обработки запроса
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error428:
+      description: Не передан обязательный If-Match
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error503:
+      description: Сервис или его собственная БД недоступны
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error500:
+      description: Внутренняя ошибка
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    UUID:
+      type: string
+      format: uuid
+    Sha256:
+      type: string
+      pattern: ^[a-f0-9]{64}$
+      description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны в 03-contracts.md.
+    SyntheticCode:
+      type: string
+      pattern: ^[A-Z0-9-]{8,80}$
+      description: Код стенда в учебном формате.
+    UnitComposition:
+      type: object
+      additionalProperties: false
+      required:
+      - unitId
+      - setCodeId
+      - kin
+      - componentCis
+      properties:
+        unitId:
+          type: string
+          format: uuid
+        setCodeId:
+          type: string
+          format: uuid
+        kin:
+          type: string
+          pattern: ^[A-Z0-9-]{8,80}$
+          description: Код стенда в учебном формате.
+        componentCis:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: string
+            pattern: ^[A-Z0-9-]{8,80}$
+            description: Код стенда в учебном формате.
+          uniqueItems: true
+    Requirement:
+      type: object
+      additionalProperties: false
+      required:
+      - sku
+      - quantity
+      properties:
+        sku:
+          type: string
+          enum:
+          - COMP-001
+        quantity:
+          type: integer
+          minimum: 2
+          maximum: 100
+    Composition:
+      type: object
+      additionalProperties: false
+      required:
+      - orderId
+      - allocationId
+      - units
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        allocationId:
+          type: string
+          format: uuid
+        units:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - unitId
+            - setCodeId
+            - kin
+            - componentCis
+            properties:
+              unitId:
+                type: string
+                format: uuid
+              setCodeId:
+                type: string
+                format: uuid
+              kin:
+                type: string
+                pattern: ^[A-Z0-9-]{8,80}$
+                description: Код стенда в учебном формате.
+              componentCis:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items:
+                  type: string
+                  pattern: ^[A-Z0-9-]{8,80}$
+                  description: Код стенда в учебном формате.
+                uniqueItems: true
+    Approval:
+      type: object
+      additionalProperties: false
+      required:
+      - actorId
+      - approvedAt
+      properties:
+        actorId:
+          type: string
+          minLength: 1
+          maxLength: 120
+        approvedAt:
+          type: string
+          format: date-time
+    Problem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - requestId
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        code:
+          type: string
+          enum:
+          - BAD_REQUEST
+          - UNAUTHENTICATED
+          - FORBIDDEN
+          - NOT_FOUND
+          - IDEMPOTENCY_CONFLICT
+          - INVALID_STATE
+          - DUPLICATE_CODE
+          - PAYLOAD_CONFLICT
+          - STALE_REVISION
+          - PRECONDITION_REQUIRED
+          - BUSINESS_RULE_VIOLATION
+          - DEPENDENCY_UNAVAILABLE
+          - INTERNAL_ERROR
+        requestId:
+          type: string
+          format: uuid
+    CreateOrder:
+      type: object
+      additionalProperties: false
+      required:
+      - recipeId
+      - quantity
+      properties:
+        recipeId:
+          type: string
+          enum:
+          - recipe-demo-v1
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 50
+    Order:
+      type: object
+      additionalProperties: false
+      required:
+      - orderId
+      - recipeId
+      - recipeVersion
+      - warehouseId
+      - setSku
+      - setGtin
+      - quantity
+      - requirements
+      - status
+      - revision
+      - createdAt
+      - updatedAt
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        recipeId:
+          type: string
+          enum:
+          - recipe-demo-v1
+        recipeVersion:
+          type: integer
+          enum:
+          - 1
+        warehouseId:
+          type: string
+          enum:
+          - warehouse-demo
+        setSku:
+          type: string
+          enum:
+          - SET-001
+        setGtin:
+          type: string
+          enum:
+          - "04600000000008"
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 50
+        requirements:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - sku
+            - quantity
+            properties:
+              sku:
+                type: string
+                enum:
+                - COMP-001
+              quantity:
+                type: integer
+                minimum: 2
+                maximum: 100
+        status:
+          type: string
+          enum:
+          - RESERVING
+          - ALLOCATING_CODES
+          - ASSEMBLING
+          - AWAITING_APPROVAL
+          - MARKING_PENDING
+          - ACCOUNTING_PENDING
+          - COMPLETED
+          - REJECTED
+          - COMPENSATING
+          - CANCELLED
+          - RECONCILIATION_REQUIRED
+          - QUARANTINED
+          - ACCOUNTING_BLOCKED
+        revision:
+          type: integer
+          minimum: 1
+        reservationId:
+          type: string
+          format: uuid
+        allocationId:
+          type: string
+          format: uuid
+        formationId:
+          type: string
+          format: uuid
+        postingId:
+          type: string
+          format: uuid
+        composition:
+          type: object
+          additionalProperties: false
+          required:
+          - orderId
+          - allocationId
+          - units
+          properties:
+            orderId:
+              type: string
+              format: uuid
+            allocationId:
+              type: string
+              format: uuid
+            units:
+              type: array
+              minItems: 1
+              maxItems: 50
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                - unitId
+                - setCodeId
+                - kin
+                - componentCis
+                properties:
+                  unitId:
+                    type: string
+                    format: uuid
+                  setCodeId:
+                    type: string
+                    format: uuid
+                  kin:
+                    type: string
+                    pattern: ^[A-Z0-9-]{8,80}$
+                    description: Код стенда в учебном формате.
+                  componentCis:
+                    type: array
+                    minItems: 2
+                    maxItems: 2
+                    items:
+                      type: string
+                      pattern: ^[A-Z0-9-]{8,80}$
+                      description: Код стенда в учебном формате.
+                    uniqueItems: true
+        compositionHash:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+              в 03-contracts.md.
+        physicalConfirmedAt:
+          type: string
+          format: date-time
+        formationApprovedAt:
+          type: string
+          format: date-time
+        markingDocumentId:
+          type: string
+        erpDocumentId:
+          type: string
+        resumeStage:
+          type: string
+          enum:
+          - ALLOCATION
+          - FORMATION
+        lastIssue:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      allOf:
+      - if:
+          properties:
+            status:
+              enum:
+              - AWAITING_APPROVAL
+              - MARKING_PENDING
+              - ACCOUNTING_PENDING
+              - COMPLETED
+              - QUARANTINED
+              - ACCOUNTING_BLOCKED
+        then:
+          required:
+          - composition
+          - compositionHash
+          - physicalConfirmedAt
+      - if:
+          properties:
+            status:
+              enum:
+              - COMPLETED
+        then:
+          required:
+          - markingDocumentId
+          - erpDocumentId
+          - postingId
+          - formationId
+    PhysicalConfirmation:
+      type: object
+      additionalProperties: false
+      required:
+      - confirmed
+      properties:
+        confirmed:
+          type: boolean
+          enum:
+          - true
+    FormationApproval:
+      type: object
+      additionalProperties: false
+      required:
+      - compositionHash
+      - approved
+      properties:
+        compositionHash:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+              в 03-contracts.md.
+        approved:
+          type: boolean
+          enum:
+          - true
+    Stock:
+      type: object
+      additionalProperties: false
+      required:
+      - warehouseId
+      - sku
+      - onHand
+      - reserved
+      - available
+      - revision
+      properties:
+        warehouseId:
+          type: string
+          enum:
+          - warehouse-demo
+        sku:
+          type: string
+          enum:
+          - COMP-001
+          - SET-001
+        onHand:
+          type: integer
+          minimum: 0
+        reserved:
+          type: integer
+          minimum: 0
+        available:
+          type: integer
+          minimum: 0
+        revision:
+          type: integer
+          minimum: 1
+      description: available=onHand-reserved, reserved<=onHand. Готовые SET-001 доступны только после ProductionRecorded.
+    Reservation:
+      type: object
+      additionalProperties: false
+      required:
+      - reservationId
+      - orderId
+      - warehouseId
+      - status
+      - requirements
+      - revision
+      - createdAt
+      - updatedAt
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        warehouseId:
+          type: string
+          enum:
+          - warehouse-demo
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - CONSUMED
+          - RELEASED
+        requirements:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - sku
+            - quantity
+            properties:
+              sku:
+                type: string
+                enum:
+                - COMP-001
+              quantity:
+                type: integer
+                minimum: 2
+                maximum: 100
+        revision:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Posting:
+      type: object
+      additionalProperties: false
+      required:
+      - postingId
+      - orderId
+      - reservationId
+      - status
+      - revision
+      - compositionHash
+      - markingDocumentId
+      - createdAt
+      - updatedAt
+      properties:
+        postingId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        reservationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - UNCERTAIN
+          - BLOCKED
+          - RECORDED
+        revision:
+          type: integer
+          minimum: 1
+        compositionHash:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+              в 03-contracts.md.
+        markingDocumentId:
+          type: string
+        erpDocumentId:
+          type: string
+        lastIssue:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      allOf:
+      - if:
+          properties:
+            status:
+              enum:
+              - RECORDED
+        then:
+          required:
+          - erpDocumentId
+    Allocation:
+      type: object
+      additionalProperties: false
+      required:
+      - allocationId
+      - orderId
+      - status
+      - revision
+      - quantity
+      - createdAt
+      - updatedAt
+      properties:
+        allocationId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - UNCERTAIN
+          - REJECTED
+          - ALLOCATED
+        revision:
+          type: integer
+          minimum: 1
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 50
+        setCodes:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - setCodeId
+            - kin
+            properties:
+              setCodeId:
+                type: string
+                format: uuid
+              kin:
+                type: string
+                pattern: ^[A-Z0-9-]{8,80}$
+                description: Код стенда в учебном формате.
+        lastIssue:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      allOf:
+      - if:
+          properties:
+            status:
+              enum:
+              - ALLOCATED
+        then:
+          required:
+          - setCodes
+    Formation:
+      type: object
+      additionalProperties: false
+      required:
+      - formationId
+      - orderId
+      - status
+      - revision
+      - compositionHash
+      - createdAt
+      - updatedAt
+      properties:
+        formationId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - UNCERTAIN
+          - REJECTED
+          - CONFIRMED
+        revision:
+          type: integer
+          minimum: 1
+        compositionHash:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Хеш SHA-256 в шестнадцатеричной записи строчными буквами. Правила нормализации и JCS описаны
+              в 03-contracts.md.
+        externalDocumentId:
+          type: string
+        lastIssue:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      allOf:
+      - if:
+          properties:
+            status:
+              enum:
+              - CONFIRMED
+        then:
+          required:
+          - externalDocumentId
+    ReconciliationAccepted:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - operationId
+      - status
+      - message
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        operationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - SCHEDULED
+        message:
+          type: string

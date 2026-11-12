@@ -1,0 +1,527 @@
+asyncapi: 3.0.0
+id: urn:marked-sets:assembly:v1
+info:
+  title: Событийный API сервиса «Сборка»
+  version: 1.0.0
+  description: Контракт сервиса «Сборка». Действие send означает отправку сообщения, receive — получение. Ход процесса
+      и правила повторов описаны в ../03-contracts.md.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+defaultContentType: application/json
+servers:
+  local:
+    host: localhost:5672
+    pathname: /
+    protocol: amqp
+    protocolVersion: 0.9.1
+    description: Локальный RabbitMQ. Каждый сервис получает учётные данные из окружения и доступ только к своим маршрутам.
+    security:
+    - $ref: '#/components/securitySchemes/serviceCredentials'
+channels:
+  reserveComponents:
+    address: sets.ReserveComponents.v1
+    description: Команда создаёт резерв по уникальному orderId. Доступный остаток рассчитывается как available = onHand
+        - reserved. При повторе значение reserved сохраняется.
+    messages:
+      ReserveComponents:
+        $ref: ./messages.yaml#/messages/ReserveComponents
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: assembly
+    x-consumer-queue: inventory.v1
+  componentsReserved:
+    address: sets.ComponentsReserved.v1
+    description: Действующий резерв (ACTIVE) и исходящее сообщение зафиксированы вместе. Подтверждение физической сборки
+        проходит отдельным шагом.
+    messages:
+      ComponentsReserved:
+        $ref: ./messages.yaml#/messages/ComponentsReserved
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: inventory
+    x-consumer-queue: assembly.v1
+  componentsReservationRejected:
+    address: sets.ComponentsReservationRejected.v1
+    description: Создание резерва отклонено. Задание остаётся без выдачи кодов и сборки.
+    messages:
+      ComponentsReservationRejected:
+        $ref: ./messages.yaml#/messages/ComponentsReservationRejected
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: inventory
+    x-consumer-queue: assembly.v1
+  allocateSetCodes:
+    address: sets.AllocateSetCodes.v1
+    description: Команда на получение количества кодов, указанного в quantity. Идентификатор allocationId сохраняется
+        при всех попытках и сверках.
+    messages:
+      AllocateSetCodes:
+        $ref: ./messages.yaml#/messages/AllocateSetCodes
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: assembly
+    x-consumer-queue: marking.v1
+  setCodesAllocated:
+    address: sets.SetCodesAllocated.v1
+    description: Сервис «Маркировка» проверил результат и сохранил в своей БД ровно quantity разных КИН. Повтор возвращает
+        те же коды.
+    messages:
+      SetCodesAllocated:
+        $ref: ./messages.yaml#/messages/SetCodesAllocated
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: marking
+    x-consumer-queue: assembly.v1
+  setCodeAllocationRejected:
+    address: sets.SetCodeAllocationRejected.v1
+    description: Окончательно известно, что выдачи кодов не было. Только это событие разрешает автоматическую компенсацию
+      резерва.
+    messages:
+      SetCodeAllocationRejected:
+        $ref: ./messages.yaml#/messages/SetCodeAllocationRejected
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: marking
+    x-consumer-queue: assembly.v1
+  releaseComponents:
+    address: sets.ReleaseComponents.v1
+    description: Освобождает резерв до физической сборки, когда получен окончательный отказ и подтверждено, что
+      коды не выдавались.
+    messages:
+      ReleaseComponents:
+        $ref: ./messages.yaml#/messages/ReleaseComponents
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: assembly
+    x-consumer-queue: inventory.v1
+  componentsReleased:
+    address: sets.ComponentsReleased.v1
+    description: Резерв RELEASED зафиксирован. Повтор не увеличивает доступный остаток.
+    messages:
+      ComponentsReleased:
+        $ref: ./messages.yaml#/messages/ComponentsReleased
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: inventory
+    x-consumer-queue: assembly.v1
+  formSets:
+    address: sets.FormSets.v1
+    description: Отправка неизменяемого состава после подтверждения физической сборки и учебного согласования состава.
+    messages:
+      FormSets:
+        $ref: ./messages.yaml#/messages/FormSets
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: assembly
+    x-consumer-queue: marking.v1
+  setsFormationConfirmed:
+    address: sets.SetsFormationConfirmed.v1
+    description: Исходный внешний документ и его состав подтверждены. Хеш совпал. После этого можно начать учёт выпуска.
+        Статус COMPLETED требует подтверждения учёта.
+    messages:
+      SetsFormationConfirmed:
+        $ref: ./messages.yaml#/messages/SetsFormationConfirmed
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: marking
+    x-consumer-queue: assembly.v1
+  setsFormationRejected:
+    address: sets.SetsFormationRejected.v1
+    description: После окончательного отказа собранные наборы переходят в карантин (QUARANTINED). Резерв и закрепления
+        кодов сохраняются для разбора.
+    messages:
+      SetsFormationRejected:
+        $ref: ./messages.yaml#/messages/SetsFormationRejected
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: marking
+    x-consumer-queue: assembly.v1
+  markingOperationUncertain:
+    address: sets.MarkingOperationUncertain.v1
+    description: Исход внешней записи неизвестен. Сервис сохраняет намерение и блокировки и сверяет исходную операцию.
+    messages:
+      MarkingOperationUncertain:
+        $ref: ./messages.yaml#/messages/MarkingOperationUncertain
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: marking
+    x-consumer-queue: assembly.v1
+  commitProduction:
+    address: sets.CommitProduction.v1
+    description: Списывает 2N компонентов и учитывает выпуск N наборов после подтверждения маркировки и сверки
+      с резервом. При повторе используется тот же postingId.
+    messages:
+      CommitProduction:
+        $ref: ./messages.yaml#/messages/CommitProduction
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: assembly
+    x-consumer-queue: inventory.v1
+  productionRecorded:
+    address: sets.ProductionRecorded.v1
+    description: Документ внешней учётной системы проверен. Локальный регистр, состояние израсходованного резерва (CONSUMED)
+        и таблица исходящих сообщений обновлены одной транзакцией.
+    messages:
+      ProductionRecorded:
+        $ref: ./messages.yaml#/messages/ProductionRecorded
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: inventory
+    x-consumer-queue: assembly.v1
+  productionUncertain:
+    address: sets.ProductionUncertain.v1
+    description: Результат внешней учётной системы пока не подтверждён. Резерв удерживается, а учёт ожидает сверки.
+    messages:
+      ProductionUncertain:
+        $ref: ./messages.yaml#/messages/ProductionUncertain
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: inventory
+    x-consumer-queue: assembly.v1
+  productionBlocked:
+    address: sets.ProductionBlocked.v1
+    description: Окончательный отказ разбирает оператор. Резерв остаётся активным, подтверждённое формирование
+      не повторяется.
+    messages:
+      ProductionBlocked:
+        $ref: ./messages.yaml#/messages/ProductionBlocked
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: sets.v1
+          type: topic
+          durable: true
+          autoDelete: false
+        bindingVersion: 0.3.0
+    x-producer: inventory
+    x-consumer-queue: assembly.v1
+operations:
+  sendReserveComponents:
+    action: send
+    title: Публикация сообщения «Зарезервировать компоненты»
+    channel:
+      $ref: '#/channels/reserveComponents'
+    messages:
+    - $ref: '#/channels/reserveComponents/messages/ReserveComponents'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveComponentsReserved:
+    action: receive
+    title: Обработка сообщения «Компоненты зарезервированы»
+    channel:
+      $ref: '#/channels/componentsReserved'
+    messages:
+    - $ref: '#/channels/componentsReserved/messages/ComponentsReserved'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveComponentsReservationRejected:
+    action: receive
+    title: Обработка сообщения «Резерв компонентов отклонён»
+    channel:
+      $ref: '#/channels/componentsReservationRejected'
+    messages:
+    - $ref: '#/channels/componentsReservationRejected/messages/ComponentsReservationRejected'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  sendAllocateSetCodes:
+    action: send
+    title: Публикация сообщения «Получить коды наборов»
+    channel:
+      $ref: '#/channels/allocateSetCodes'
+    messages:
+    - $ref: '#/channels/allocateSetCodes/messages/AllocateSetCodes'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveSetCodesAllocated:
+    action: receive
+    title: Обработка сообщения «Коды наборов получены»
+    channel:
+      $ref: '#/channels/setCodesAllocated'
+    messages:
+    - $ref: '#/channels/setCodesAllocated/messages/SetCodesAllocated'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveSetCodeAllocationRejected:
+    action: receive
+    title: Обработка сообщения «Выдача кодов наборов отклонена»
+    channel:
+      $ref: '#/channels/setCodeAllocationRejected'
+    messages:
+    - $ref: '#/channels/setCodeAllocationRejected/messages/SetCodeAllocationRejected'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  sendReleaseComponents:
+    action: send
+    title: Публикация сообщения «Освободить резерв компонентов»
+    channel:
+      $ref: '#/channels/releaseComponents'
+    messages:
+    - $ref: '#/channels/releaseComponents/messages/ReleaseComponents'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveComponentsReleased:
+    action: receive
+    title: Обработка сообщения «Резерв компонентов освобождён»
+    channel:
+      $ref: '#/channels/componentsReleased'
+    messages:
+    - $ref: '#/channels/componentsReleased/messages/ComponentsReleased'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  sendFormSets:
+    action: send
+    title: Публикация сообщения «Сформировать наборы»
+    channel:
+      $ref: '#/channels/formSets'
+    messages:
+    - $ref: '#/channels/formSets/messages/FormSets'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveSetsFormationConfirmed:
+    action: receive
+    title: Обработка сообщения «Формирование наборов подтверждено»
+    channel:
+      $ref: '#/channels/setsFormationConfirmed'
+    messages:
+    - $ref: '#/channels/setsFormationConfirmed/messages/SetsFormationConfirmed'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveSetsFormationRejected:
+    action: receive
+    title: Обработка сообщения «Формирование наборов отклонено»
+    channel:
+      $ref: '#/channels/setsFormationRejected'
+    messages:
+    - $ref: '#/channels/setsFormationRejected/messages/SetsFormationRejected'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveMarkingOperationUncertain:
+    action: receive
+    title: Обработка сообщения «Исход операции маркировки неизвестен»
+    channel:
+      $ref: '#/channels/markingOperationUncertain'
+    messages:
+    - $ref: '#/channels/markingOperationUncertain/messages/MarkingOperationUncertain'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  sendCommitProduction:
+    action: send
+    title: Публикация сообщения «Учесть выпуск наборов»
+    channel:
+      $ref: '#/channels/commitProduction'
+    messages:
+    - $ref: '#/channels/commitProduction/messages/CommitProduction'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveProductionRecorded:
+    action: receive
+    title: Обработка сообщения «Выпуск наборов учтён»
+    channel:
+      $ref: '#/channels/productionRecorded'
+    messages:
+    - $ref: '#/channels/productionRecorded/messages/ProductionRecorded'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveProductionUncertain:
+    action: receive
+    title: Обработка сообщения «Исход учёта выпуска неизвестен»
+    channel:
+      $ref: '#/channels/productionUncertain'
+    messages:
+    - $ref: '#/channels/productionUncertain/messages/ProductionUncertain'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+  receiveProductionBlocked:
+    action: receive
+    title: Обработка сообщения «Учёт выпуска заблокирован»
+    channel:
+      $ref: '#/channels/productionBlocked'
+    messages:
+    - $ref: '#/channels/productionBlocked/messages/ProductionBlocked'
+    bindings:
+      amqp:
+        deliveryMode: 2
+        ack: true
+        mandatory: true
+        bindingVersion: 0.3.0
+components:
+  securitySchemes:
+    serviceCredentials:
+      type: userPassword
+      description: У каждого сервиса своя учётная запись RabbitMQ. Пароль передаётся через окружение.
+x-consumer-queue:
+  name: assembly.v1
+  durable: true
+  autoDelete: false
+  deadLetterQueue: assembly.dlq.v1
+  retryQueues:
+  - assembly.retry-5s.v1
+  - assembly.retry-30s.v1
+  - assembly.retry-120s.v1

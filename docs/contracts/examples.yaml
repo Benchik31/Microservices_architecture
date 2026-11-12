@@ -1,0 +1,267 @@
+description: Примеры сообщений для одного набора с учебными кодами. События об отказах относятся к отдельным
+  сценариям.
+identifiers:
+  order: fcf08387-7efd-5232-baa8-6a5d96620e50
+  reservation: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+  allocation: 17bfe393-55d8-5d06-9106-049d4fa9870d
+  formation: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+  posting: 0312de5e-d03a-5821-9d33-b08764101c46
+  unit: 247535ce-7ae5-5ce1-8331-ba42cac2e4f7
+  setcode: e217645e-d8ca-55a3-b31a-0b6888ed7bf9
+  actor: ab49da72-4d50-5067-a518-592c198e8635
+  request: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+compositionHash: 42378cf420d468ea651c0536a05ff89f15fcb75bf42e9499b8884e942ef4a5ca
+messages:
+  ReserveComponents:
+    messageId: 0f897b84-dcd9-5d35-9f89-f9506b9bae4b
+    type: ReserveComponents
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: assembly
+    aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    aggregateVersion: 1
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+      warehouseId: warehouse-demo
+      requirements:
+      - sku: COMP-001
+        quantity: 2
+  ComponentsReserved:
+    messageId: ca8f9fc2-68a0-58f1-b7fb-98dba0a45e64
+    type: ComponentsReserved
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: inventory
+    aggregateId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+    aggregateVersion: 2
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+  ComponentsReservationRejected:
+    messageId: c4a21f76-e113-5457-8a77-3b657145e2c4
+    type: ComponentsReservationRejected
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: inventory
+    aggregateId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+    aggregateVersion: 3
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+      reason: INSUFFICIENT_STOCK
+  AllocateSetCodes:
+    messageId: 4c455436-e8fc-5665-9a3a-3970f391bb2b
+    type: AllocateSetCodes
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: assembly
+    aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    aggregateVersion: 4
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+      setGtin: "04600000000008"
+      quantity: 1
+  SetCodesAllocated:
+    messageId: 3d5a730c-d24d-5bb0-a686-eed02073bcbb
+    type: SetCodesAllocated
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: marking
+    aggregateId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+    aggregateVersion: 5
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+      setCodes:
+      - setCodeId: e217645e-d8ca-55a3-b31a-0b6888ed7bf9
+        kin: KIN-DEMO-00000001
+  SetCodeAllocationRejected:
+    messageId: e24e1b97-147d-560a-a687-e1d2a9928c2b
+    type: SetCodeAllocationRejected
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: marking
+    aggregateId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+    aggregateVersion: 6
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+      reason: ALLOCATION_REJECTED
+  ReleaseComponents:
+    messageId: 4677e9cd-d35d-598b-9e8b-bb9310e2bd31
+    type: ReleaseComponents
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: assembly
+    aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    aggregateVersion: 7
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+      reason: CODE_ALLOCATION_REJECTED
+  ComponentsReleased:
+    messageId: e54366ac-65bb-5907-88d4-8495bd06f11d
+    type: ComponentsReleased
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: inventory
+    aggregateId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+    aggregateVersion: 8
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+      reason: CODE_ALLOCATION_REJECTED
+  FormSets:
+    messageId: eadd2279-d6f7-50e6-9f80-05cbda535456
+    type: FormSets
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: assembly
+    aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    aggregateVersion: 9
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+      formationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+      compositionHash: 42378cf420d468ea651c0536a05ff89f15fcb75bf42e9499b8884e942ef4a5ca
+      composition:
+        orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+        allocationId: 17bfe393-55d8-5d06-9106-049d4fa9870d
+        units:
+        - unitId: 247535ce-7ae5-5ce1-8331-ba42cac2e4f7
+          setCodeId: e217645e-d8ca-55a3-b31a-0b6888ed7bf9
+          kin: KIN-DEMO-00000001
+          componentCis:
+          - CIS-DEMO-00000001
+          - CIS-DEMO-00000002
+      approval:
+        actorId: signer-demo
+        approvedAt: '2026-11-09T09:10:00Z'
+  SetsFormationConfirmed:
+    messageId: e8c1e993-4b55-567f-ab01-87930da9e6ba
+    type: SetsFormationConfirmed
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: marking
+    aggregateId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+    aggregateVersion: 10
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      formationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+      compositionHash: 42378cf420d468ea651c0536a05ff89f15fcb75bf42e9499b8884e942ef4a5ca
+      externalDocumentId: marking-doc-demo-001
+  SetsFormationRejected:
+    messageId: c1cd2375-0c1a-56fb-9160-6aa495ec5f9c
+    type: SetsFormationRejected
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: marking
+    aggregateId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+    aggregateVersion: 11
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      formationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+      reason: EXTERNAL_REJECTION
+  MarkingOperationUncertain:
+    messageId: 9921f1aa-b684-5a85-a70a-caf0d80a92cb
+    type: MarkingOperationUncertain
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: marking
+    aggregateId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+    aggregateVersion: 12
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      operationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+      stage: FORMATION
+      reason: CONNECTION_LOST
+  CommitProduction:
+    messageId: 0170c033-6b5a-5a58-ae54-2704ac70b44c
+    type: CommitProduction
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: assembly
+    aggregateId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    aggregateVersion: 13
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      reservationId: 434babe4-c22d-513b-aaf8-bb97ccb72d93
+      postingId: 0312de5e-d03a-5821-9d33-b08764101c46
+      formationId: a4f58e24-ce2e-5e78-bc32-9e0552a972c7
+      compositionHash: 42378cf420d468ea651c0536a05ff89f15fcb75bf42e9499b8884e942ef4a5ca
+      markingDocumentId: marking-doc-demo-001
+      setSku: SET-001
+      quantity: 1
+      requirements:
+      - sku: COMP-001
+        quantity: 2
+  ProductionRecorded:
+    messageId: 0107b598-3244-5aff-8835-ca09fff864c8
+    type: ProductionRecorded
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: inventory
+    aggregateId: 0312de5e-d03a-5821-9d33-b08764101c46
+    aggregateVersion: 14
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      postingId: 0312de5e-d03a-5821-9d33-b08764101c46
+      erpDocumentId: erp-doc-demo-001
+  ProductionUncertain:
+    messageId: 25c953b5-08ff-5874-9ae4-e59bd4774952
+    type: ProductionUncertain
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: inventory
+    aggregateId: 0312de5e-d03a-5821-9d33-b08764101c46
+    aggregateVersion: 15
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      postingId: 0312de5e-d03a-5821-9d33-b08764101c46
+      reason: CONNECTION_LOST
+  ProductionBlocked:
+    messageId: 39dff25e-211d-5be7-ba50-e2e3fae345af
+    type: ProductionBlocked
+    schemaVersion: 1
+    occurredAt: '2026-11-09T09:15:00Z'
+    correlationId: fcf08387-7efd-5232-baa8-6a5d96620e50
+    causationId: 79dfaa83-c873-577b-bf84-54ca81e23dc7
+    producer: inventory
+    aggregateId: 0312de5e-d03a-5821-9d33-b08764101c46
+    aggregateVersion: 16
+    data:
+      orderId: fcf08387-7efd-5232-baa8-6a5d96620e50
+      postingId: 0312de5e-d03a-5821-9d33-b08764101c46
+      reason: EXTERNAL_REJECTION
